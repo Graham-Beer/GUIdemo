@@ -6,8 +6,9 @@ function New-PSHost {
     param (
         [String[]]$Module
     )
-
-    $initialSessionState = [InitialSessionState]::CreateDefault()
+    
+    # # Create runspace session state
+    $initialSessionState = [System.Management.Automation.Runspaces.InitialSessionState]::CreateDefault()
     foreach ($name in $Module) {
         $initialSessionState.ImportPSModule($name)
     }
