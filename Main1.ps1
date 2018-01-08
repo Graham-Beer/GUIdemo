@@ -1,12 +1,9 @@
 Add-Type -AssemblyName PresentationFramework
 
 ## Import Modules
-# Import-Module .\Module\Office365ToolKit.psm1 -Force
-# Import-Module .\Module\Gui-Wrapper-Scripts.psm1 -Force
 
 # Commands to display
-# $commands = 'NewUser', 'AddMembership','MultiFactorAuthentication', 'PasswordReset', 'RoleChange', 'RemoveMembership', 'SetAccountOnHold','RestoreAccountFromHold'
-$commands = 'Get-Childitem', 'Get-Content', 'Get-Process'
+$commands = 'Get-ChildItem', 'Get-Content', 'Get-Process'
 # Utility
 
 function Get-CommandParameter {
@@ -26,14 +23,16 @@ function Get-CommandParameter {
 
         if ($commandInfo) {
             if ($commandInfo.ParameterSets.Count -eq 1) {
-                $parameters = $commandInfo.ParameterSets[0].Parameters
+                $parameterSetName = $commandInfo.ParameterSets[0].Name
             } else {
-                $parameters = $commandInfo.ParameterSets.Where{ $_.IsDefault }.Parameters
+                $parameterSetName = $commandInfo.ParameterSets.Where{ $_.IsDefault }.Name
             }
-            $parameters = $parameters |
+            $parameters = $commandInfo.ParameterSets.Where{ $_.Name -eq $parameterSetName }.Parameters |
                 Where-Object { 
                     $_.Name -notin $defaultParams -and 
-                    -not (($_.Attributes | Where-Object { $_ -is [Parameter] }).DontShow)
+                    -not $_.Attributes.Where{
+                        $_ -is [Parameter] -and
+                        -not $_.ParameterSetName -eq $parameterSetName }.DontShow
                 } |
                 Select-Object *, DefaultValue, @{n = 'ValidValues'; e = {
                     
@@ -390,6 +389,11 @@ $MainWindow.FindName("Run").Add_Click({
         $command = $sender.FindName("SelectedCommand").Content
         $grid = $sender.FindName("Parameters")
 
+        $defaultValues = @{}
+        foreach ($parameter in Get-CommandParameter $command -GetDefaultValues) {
+            $defaultValues.Add($parameter.Name, $parameter.DefaultValue)
+        }
+
         $parameter = @{}
         for ($i = 1; $i -lt $grid.Children.Count; $i += 2) {
             if ($grid.Children[$i] -is [System.Windows.Controls.TextBox] -and $grid.Children[$i].AcceptsReturn) {
@@ -405,29 +409,31 @@ $MainWindow.FindName("Run").Add_Click({
             }
            if ($null -ne $value -and -not [String]::IsNullOrEmpty($value)) {
                 $name = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($grid.Children[$i].Name -replace '_', '=')))
-                $parameter.Add($Name, $value)
+                if ($defaultValues[$name] -ne $value) {
+                    $parameter.Add($name, $value)
+                }
             }
         }   
 
         # Prepare the results window
         $ResultsXaml = '<?xml version="1.0" encoding="utf-8"?>
-    <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-            Name="Window" Height="500" Width="500">
-        <DockPanel>
-            <DockPanel DockPanel.Dock="Bottom">
-                <Button Name="Close" Content="Close" Margin="5" Padding="5" Width="70" DockPanel.Dock="Right" />
-                <!-- Here to prevent either button filling the rest -->
-                <Label />
-            </DockPanel>
-            <ListView Name="OutputList" DockPanel.Dock="Top">
-                <ListView.View>
-                    <GridView />
-                </ListView.View>
-            </ListView>
-            <Label Name="Raw" />
-        </DockPanel>
-    </Window>'
+            <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    Name="Window" Height="500" Width="500">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Bottom">
+                        <Button Name="Close" Content="Close" Margin="5" Padding="5" Width="70" DockPanel.Dock="Right" />
+                        <!-- Here to prevent either button filling the rest -->
+                        <Label />
+                    </DockPanel>
+                    <ListView Name="OutputList" DockPanel.Dock="Top">
+                        <ListView.View>
+                            <GridView />
+                        </ListView.View>
+                    </ListView>
+                    <Label Name="Raw" />
+                </DockPanel>
+            </Window>'
 
         $params = @{
             Command               = $command
@@ -509,8 +515,7 @@ foreach ($command in $commands) {
     Add-GuiCommand $command -Window $MainWindow | Out-Null
 }
 
-
 # Create the PS host to execute commands
-# $PSHost = New-PSHost -Module ./Office365ToolKit.psm1
+# $PSHost = New-PSHost -Module 
 
 $MainWindow.ShowDialog()
