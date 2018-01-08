@@ -1,3 +1,4 @@
+# Adds a Microsoft .NET Framework type (a class) to a Windows PowerShell session
 Add-Type -AssemblyName PresentationFramework
 
 ## Import Modules ##
@@ -16,6 +17,22 @@ $commands = 'Get-ChildItem', 'Get-Process'
 # To gain information about the command parameters thats being added to the GUI.
 # Information being built as to how the GUI will display the command parameters.  
 
+# Demo command, 'Get-CommandParameter Get-ChildItem -GetDefaultValues | select -first 2'
+# Example of a parameter value
+# Name                            : Path
+# ParameterType                   : System.String[]
+# IsMandatory                     : False
+# IsDynamic                       : False
+# Position                        : 0
+# ValueFromPipeline               : True
+# ValueFromPipelineByPropertyName : True
+# ValueFromRemainingArguments     : False
+# HelpMessage                     :
+# Aliases                         : {}
+# Attributes                      : {Items}
+# DefaultValue                    :
+# ValidValues                     :
+
 function Get-CommandParameter {
     param (
         [Parameter(Mandatory = $true)]
@@ -23,11 +40,14 @@ function Get-CommandParameter {
 
         [Switch]$GetDefaultValues
     )
-
+    # Common parameters, i.e. Verbose, ErrorAction, Debug etc
     $commonParameters = ([System.Management.Automation.Internal.CommonParameters]).GetProperties().Name
+    # 'ShouldProcess parameters' i.e. 'WhatIf', 'Confirm'
     $shouldProcessParameters = ([System.Management.Automation.Internal.ShouldProcessParameters]).GetProperties().Name
+    # Collect both set of results and add to '$defaultParams'.
     $defaultParams = $commonParameters + $shouldProcessParameters
     
+    # Get command information and go through each parameter
     try {
         $commandInfo = Get-Command $Command -ErrorAction Stop
 
@@ -84,6 +104,7 @@ function Get-CommandParameter {
                     }
                 }
             }
+            # Pass parameter information along the pipeline
             $parameters
         }
     }
